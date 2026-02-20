@@ -225,6 +225,10 @@ class SaleViewSet(viewsets.ModelViewSet):
 
 
 # ─── M-Pesa ────────────────────────────────────────────────────────────────────
+import time
+
+# Module-level token cache
+_token_cache = {'token': None, 'expires_at': 0}
 
 class MpesaService:
     """Daraja API integration"""
@@ -243,31 +247,35 @@ class MpesaService:
         return 'https://sandbox.safaricom.co.ke'
 
     def get_access_token(self):
+        # Return cached token if still valid (with 60s buffer)
+        if _token_cache['token'] and time.time() < _token_cache['expires_at'] - 60:
+            logger.debug("[MPESA] Using cached token")
+            return _token_cache['token']
+
         url = f"{self.base_url}/oauth/v1/generate?grant_type=client_credentials"
         credentials = base64.b64encode(
             f"{self.CONSUMER_KEY}:{self.CONSUMER_SECRET}".encode()
         ).decode()
+
+        resp = requests.get(
+            url,
+            headers={
+                'Authorization': f'Basic {credentials}',
+                'User-Agent': 'MyPharmacyApp/1.0',
+                'Accept': 'application/json',
+                'Cache-Control': 'no-cache',
+            },
+            timeout=10
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        # Cache for ~1 hour (token expires in 3599s)
+        _token_cache['token'] = data['access_token']
+        _token_cache['expires_at'] = time.time() + int(data.get('expires_in', 3599))
         
-        logger.debug(f"[MPESA] Getting token from: {url}")
-        logger.debug(f"[MPESA] Consumer Key (first 10): {self.CONSUMER_KEY[:10]}...")
-        
-        try:
-            resp = requests.get(
-                url, 
-                headers={'Authorization': f'Basic {credentials}'}, 
-                timeout=10
-            )
-            logger.debug(f"[MPESA] Token response status: {resp.status_code}")
-            logger.debug(f"[MPESA] Token response body: {resp.text}")
-            resp.raise_for_status()
-            token = resp.json()['access_token']
-            logger.debug(f"[MPESA] Token obtained successfully (first 10): {token[:10]}...")
-            return token
-        except Exception as e:
-            logger.error(f"[MPESA] Token fetch FAILED: {e}")
-            if hasattr(e, 'response') and e.response is not None:
-                logger.error(f"[MPESA] Token error response body: {e.response.text}")
-            raise
+        logger.debug(f"[MPESA] Fresh token cached, expires in {data.get('expires_in')}s")
+        return _token_cache['token']
 
     def get_password(self, timestamp):
         raw = f"{self.SHORTCODE}{self.PASSKEY}{timestamp}"
@@ -418,27 +426,31 @@ class MpesaViewSet(viewsets.GenericViewSet):
         except MpesaTransaction.DoesNotExist:
             return Response({'error': 'Transaction not found'}, status=404)
 
-        if txn.status == 'pending':
-            try:
-                resp = mpesa_service.query_stk_status(checkout_id)
-                result_code = str(resp.get('ResultCode', ''))
-                if result_code == '0':
-                    txn.status = 'success'
-                    txn.result_code = result_code
-                    txn.save()
-                    if txn.sale:
-                        txn.sale.status = 'completed'
-                        txn.sale.save()
-                elif result_code in ['1032', '1037']:
-                    txn.status = 'cancelled'
-                    txn.result_description = resp.get('ResultDesc', '')
-                    txn.save()
-                elif result_code:
-                    txn.status = 'failed'
-                    txn.result_description = resp.get('ResultDesc', '')
-                    txn.save()
-            except Exception as e:
-                logger.warning(f"Status check error: {e}")
+        # ✅ Don't call Safaricom if already resolved
+        if txn.status in ['success', 'failed', 'cancelled', 'timeout']:
+            return Response(MpesaTransactionSerializer(txn).data)
+
+        # Only query Safaricom if still pending
+        try:
+            resp = mpesa_service.query_stk_status(checkout_id)
+            result_code = str(resp.get('ResultCode', ''))
+            if result_code == '0':
+                txn.status = 'success'
+                txn.result_code = result_code
+                txn.save()
+                if txn.sale:
+                    txn.sale.status = 'completed'
+                    txn.sale.save()
+            elif result_code in ['1032', '1037']:
+                txn.status = 'cancelled'
+                txn.result_description = resp.get('ResultDesc', '')
+                txn.save()
+            elif result_code:
+                txn.status = 'failed'
+                txn.result_description = resp.get('ResultDesc', '')
+                txn.save()
+        except Exception as e:
+            logger.warning(f"Status check error: {e}")
 
         return Response(MpesaTransactionSerializer(txn).data)
 
