@@ -390,13 +390,17 @@ class MpesaViewSet(viewsets.GenericViewSet):
             return Response({'error': str(e)}, status=500)
 
         if resp.get('ResponseCode') == '0':
-            txn = MpesaTransaction.objects.create(
+            txn, _ = MpesaTransaction.objects.update_or_create(
                 sale=sale,
-                checkout_request_id=resp['CheckoutRequestID'],
-                merchant_request_id=resp.get('MerchantRequestID', ''),
-                phone_number=phone,
-                amount=amount,
-                status='pending'
+                defaults={
+                    'checkout_request_id': resp['CheckoutRequestID'],
+                    'merchant_request_id': resp.get('MerchantRequestID', ''),
+                    'phone_number': phone,
+                    'amount': amount,
+                    'status': 'pending',
+                    'result_code': '',
+                    'result_description': '',
+                }
             )
             return Response({
                 'checkout_request_id': txn.checkout_request_id,
