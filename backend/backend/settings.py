@@ -1,4 +1,7 @@
 import os
+from pathlib import Path
+from datetime import timedelta
+from decouple import config
 
 from pathlib import Path
 
@@ -27,10 +30,17 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    
+    # Third-party
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'corsheaders',
+    
     'pharmacy_app',
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',   # must be FIRST
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -101,13 +111,42 @@ USE_I18N = True
 
 USE_TZ = True
 
+# ─── REST Framework ────────────────────────────────────────────────────────────
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': (
+        'rest_framework.permissions.IsAuthenticated',
+    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+}
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=8),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
 
-STATIC_URL = 'static/'
+# ─── CORS ──────────────────────────────────────────────────────────────────────
+CORS_ALLOWED_ORIGINS = config(
+    'CORS_ALLOWED_ORIGINS',
+    default='http://localhost:5173,http://localhost:3000'
+).split(',')
+CORS_ALLOW_CREDENTIALS = True
 
-# Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
+# ─── Media (medicine images) ───────────────────────────────────────────────────
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+# ─── Static ────────────────────────────────────────────────────────────────────
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# ─── M-Pesa Daraja Config ──────────────────────────────────────────────────────
+MPESA_CONSUMER_KEY     = config('MPESA_CONSUMER_KEY', default='')
+MPESA_CONSUMER_SECRET  = config('MPESA_CONSUMER_SECRET', default='')
+MPESA_SHORTCODE        = config('MPESA_SHORTCODE', default='174379')
+MPESA_PASSKEY          = config('MPESA_PASSKEY', default='')
+MPESA_CALLBACK_URL     = config('MPESA_CALLBACK_URL', default='https://yourdomain.com/api/mpesa/callback/')
+MPESA_ENVIRONMENT      = config('MPESA_ENVIRONMENT', default='sandbox')  # or 'production'
