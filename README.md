@@ -346,6 +346,40 @@ Receipt modal shown to cashier
 
 ---
 
+pharma-frontend/
+├── index.html              ← Bootstrap Icons CDN, Syne + DM Sans fonts
+├── vite.config.js          ← Path aliases (@/components etc), proxy to Django :8000
+├── package.json            ← All deps (axios, recharts, react-hot-toast, date-fns)
+├── .env.local              ← VITE_API_BASE config
+├── public/favicon.svg
+└── src/
+    ├── main.jsx            ← Entry, imports all CSS, configures react-hot-toast
+    ├── App.jsx             ← Shell: AuthProvider → Sidebar + Topbar + Pages
+    ├── styles/
+    │   ├── variables.css   ← All CSS custom properties (colors, fonts, spacing, radii)
+    │   ├── global.css      ← Reset, keyframes, utility classes, skeleton shimmer
+    │   ├── components.css  ← Buttons, forms, cards, badges, tables, modals, spinners
+    │   ├── layout.css      ← Sidebar (fixed+drawer), Topbar, main wrapper, breakpoints
+    │   └── pages.css       ← Login, Dashboard, POS, Medicines, Sales page styles
+    ├── context/
+    │   └── AuthContext.jsx ← JWT login/logout, token storage
+    ├── hooks/
+    │   ├── useDebounce.js  ← Debounce for search inputs
+    │   └── useSidebar.js   ← Drawer open/close + ESC key + body scroll lock
+    ├── utils/
+    │   └── api.js          ← Axios instance, JWT interceptors, auto token refresh, all API calls
+    ├── components/
+    │   ├── Sidebar.jsx     ← Drawer sidebar with overlay for mobile (Bootstrap Icons)
+    │   ├── Topbar.jsx      ← Hamburger menu button, page title, live indicator
+    │   ├── MpesaModal.jsx  ← STK push → polling → success/fail states
+    │   └── ReceiptModal.jsx← Receipt view + browser print dialog
+    └── pages/
+        ├── LoginPage.jsx   ← Animated login with show/hide password
+        ├── DashboardPage.jsx ← Stats, 7-day bar chart, payment bars, top medicines
+        ├── MedicinesPage.jsx ← CRUD table, image upload, modal form
+        ├── POSPage.jsx     ← Search dropdown, cart, checkout, M-Pesa/cash/card
+        └── SalesPage.jsx   ← Filterable history table, receipt viewer
+
 ## 🔒 Authentication
 
 The system uses **JWT (JSON Web Tokens)** via `djangorestframework-simplejwt`:

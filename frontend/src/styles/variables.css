@@ -1,0 +1,74 @@
+/* ─── src/styles/variables.css ───────────────────────────────────────────── */
+
+:root {
+  /* Brand */
+  --primary: #00d68f;
+  --primary-dark: #00b377;
+  --primary-light: #00ffa8;
+  --primary-glow: rgba(0, 214, 143, 0.18);
+  --primary-subtle: rgba(0, 214, 143, 0.08);
+
+  /* Backgrounds */
+  --bg-base:    #080d1a;
+  --bg-surface: #0d1526;
+  --bg-card:    #111e33;
+  --bg-card2:   #162038;
+  --bg-input:   #0d1526;
+  --bg-hover:   rgba(255, 255, 255, 0.03);
+
+  /* Borders */
+  --border:       rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-accent: rgba(0, 214, 143, 0.25);
+
+  /* Text */
+  --text-primary:   #e8f0fe;
+  --text-secondary: #7a8aaa;
+  --text-muted:     #4a5568;
+  --text-accent:    var(--primary);
+
+  /* Status colours */
+  --success: #00d68f;
+  --warning: #ffb020;
+  --danger:  #ff4d6d;
+  --info:    #4facfe;
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'DM Sans', sans-serif;
+  --font-mono:    'DM Mono', monospace;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Radius */
+  --radius-sm:  6px;
+  --radius-md:  10px;
+  --radius-lg:  14px;
+  --radius-xl:  20px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm:  0 1px 3px rgba(0,0,0,0.3);
+  --shadow-md:  0 4px 16px rgba(0,0,0,0.4);
+  --shadow-lg:  0 8px 40px rgba(0,0,0,0.5);
+  --shadow-glow: 0 0 30px rgba(0, 214, 143, 0.25);
+
+  /* Sidebar */
+  --sidebar-width: 248px;
+  --sidebar-collapsed: 70px;
+
+  /* Topbar */
+  --topbar-height: 60px;
+
+  /* Transition */
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}

@@ -1,35 +1,57 @@
+// src/App.jsx
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { AuthProvider, useAuth } from '@context/AuthContext'
+import { useSidebar } from '@hooks/useSidebar'
+import Sidebar from '@components/Sidebar'
+import Topbar from '@components/Topbar'
+import LoginPage from '@pages/LoginPage'
+import DashboardPage from '@pages/DashboardPage'
+import MedicinesPage from '@pages/MedicinesPage'
+import POSPage from '@pages/POSPage'
+import SalesPage from '@pages/SalesPage'
 
-function App() {
-  const [count, setCount] = useState(0)
+const PAGES = {
+  dashboard: DashboardPage,
+  medicines: MedicinesPage,
+  pos:       POSPage,
+  sales:     SalesPage,
+}
+
+function AppShell() {
+  const { isAuthenticated } = useAuth()
+  const [activePage, setActivePage] = useState('dashboard')
+  const sidebar = useSidebar()
+
+  if (!isAuthenticated) return <LoginPage />
+
+  const PageComponent = PAGES[activePage] || DashboardPage
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <div className="app-shell">
+      <Sidebar
+        activePage={activePage}
+        setPage={setActivePage}
+        isOpen={sidebar.isOpen}
+        onClose={sidebar.close}
+      />
+
+      <div className="main-wrapper">
+        <Topbar
+          activePage={activePage}
+          onMenuClick={sidebar.toggle}
+        />
+        <main className="page-content">
+          <PageComponent key={activePage} />
+        </main>
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    </div>
   )
 }
 
-export default App
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppShell />
+    </AuthProvider>
+  )
+}
