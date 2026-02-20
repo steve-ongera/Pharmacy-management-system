@@ -454,31 +454,35 @@ class MpesaViewSet(viewsets.GenericViewSet):
 
         return Response(MpesaTransactionSerializer(txn).data)
 
-    @action(
-        detail=False, methods=['post'], url_path='callback',
-        permission_classes=[AllowAny]
-    )
+    @action(detail=False, methods=['post'], url_path='callback', permission_classes=[AllowAny])
     def callback(self, request):
-        """M-Pesa callback URL — Safaricom posts here"""
         data = request.data
+        logger.debug(f"[MPESA] Callback received: {json.dumps(data)}")  # ADD THIS
+        
         body = data.get('Body', {}).get('stkCallback', {})
         checkout_id = body.get('CheckoutRequestID')
         result_code = str(body.get('ResultCode', ''))
         result_desc = body.get('ResultDesc', '')
 
+        logger.debug(f"[MPESA] Callback checkout_id: {checkout_id}, result_code: {result_code}")
+
         try:
             txn = MpesaTransaction.objects.get(checkout_request_id=checkout_id)
+            logger.debug(f"[MPESA] Found transaction: {txn.id}, current status: {txn.status}")
         except MpesaTransaction.DoesNotExist:
+            logger.error(f"[MPESA] Transaction NOT FOUND for checkout_id: {checkout_id}")
             return Response({'ResultCode': 0, 'ResultDesc': 'Accepted'})
 
         if result_code == '0':
             callback_metadata = body.get('CallbackMetadata', {}).get('Item', [])
             meta = {item['Name']: item.get('Value') for item in callback_metadata}
+            logger.debug(f"[MPESA] Callback metadata: {meta}")
             txn.status = 'success'
             txn.mpesa_receipt_number = meta.get('MpesaReceiptNumber', '')
             txn.transaction_date = timezone.now()
             if txn.sale:
                 txn.sale.status = 'completed'
+                txn.sale.amount_paid = txn.amount
                 txn.sale.save()
         else:
             txn.status = 'cancelled' if result_code == '1032' else 'failed'
@@ -486,5 +490,6 @@ class MpesaViewSet(viewsets.GenericViewSet):
         txn.result_code = result_code
         txn.result_description = result_desc
         txn.save()
+        logger.debug(f"[MPESA] Transaction updated to status: {txn.status}")
 
         return Response({'ResultCode': 0, 'ResultDesc': 'Accepted'})
