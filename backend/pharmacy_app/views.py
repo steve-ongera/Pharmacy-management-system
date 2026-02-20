@@ -247,21 +247,43 @@ class MpesaService:
         credentials = base64.b64encode(
             f"{self.CONSUMER_KEY}:{self.CONSUMER_SECRET}".encode()
         ).decode()
-        resp = requests.get(url, headers={'Authorization': f'Basic {credentials}'}, timeout=10)
-        resp.raise_for_status()
-        return resp.json()['access_token']
+        
+        logger.debug(f"[MPESA] Getting token from: {url}")
+        logger.debug(f"[MPESA] Consumer Key (first 10): {self.CONSUMER_KEY[:10]}...")
+        
+        try:
+            resp = requests.get(
+                url, 
+                headers={'Authorization': f'Basic {credentials}'}, 
+                timeout=10
+            )
+            logger.debug(f"[MPESA] Token response status: {resp.status_code}")
+            logger.debug(f"[MPESA] Token response body: {resp.text}")
+            resp.raise_for_status()
+            token = resp.json()['access_token']
+            logger.debug(f"[MPESA] Token obtained successfully (first 10): {token[:10]}...")
+            return token
+        except Exception as e:
+            logger.error(f"[MPESA] Token fetch FAILED: {e}")
+            if hasattr(e, 'response') and e.response is not None:
+                logger.error(f"[MPESA] Token error response body: {e.response.text}")
+            raise
 
     def get_password(self, timestamp):
         raw = f"{self.SHORTCODE}{self.PASSKEY}{timestamp}"
+        logger.debug(f"[MPESA] Password raw string: {self.SHORTCODE} + {self.PASSKEY} + {timestamp}")
+        logger.debug(f"[MPESA] Full raw (first 30 chars): {raw[:30]}")
         return base64.b64encode(raw.encode()).decode()
 
     def stk_push(self, phone: str, amount: int, account_ref: str, description: str):
         token = self.get_access_token()
         timestamp = timezone.now().strftime('%Y%m%d%H%M%S')
+        password = self.get_password(timestamp)
+        
         url = f"{self.base_url}/mpesa/stkpush/v1/processrequest"
         payload = {
             "BusinessShortCode": self.SHORTCODE,
-            "Password": self.get_password(timestamp),
+            "Password": password,
             "Timestamp": timestamp,
             "TransactionType": "CustomerPayBillOnline",
             "Amount": int(amount),
@@ -272,14 +294,39 @@ class MpesaService:
             "AccountReference": account_ref,
             "TransactionDesc": description
         }
-        resp = requests.post(
-            url,
-            json=payload,
-            headers={'Authorization': f'Bearer {token}'},
-            timeout=30
-        )
-        resp.raise_for_status()
-        return resp.json()
+        
+        logger.debug(f"[MPESA] STK Push URL: {url}")
+        logger.debug(f"[MPESA] STK Push payload: {json.dumps({**payload, 'Password': '***HIDDEN***'})}")
+        logger.debug(f"[MPESA] Shortcode: {self.SHORTCODE}")
+        logger.debug(f"[MPESA] Passkey (first 10): {self.PASSKEY[:10] if self.PASSKEY else 'EMPTY!'}")
+        logger.debug(f"[MPESA] Timestamp: {timestamp}")
+        logger.debug(f"[MPESA] Phone: {phone}")
+        logger.debug(f"[MPESA] Amount: {amount}")
+        logger.debug(f"[MPESA] Callback URL: {self.CALLBACK_URL}")
+        logger.debug(f"[MPESA] Environment: {self.ENVIRONMENT}")
+        
+        try:
+            resp = requests.post(
+                url,
+                json=payload,
+                headers={'Authorization': f'Bearer {token}'},
+                timeout=30
+            )
+            logger.debug(f"[MPESA] STK response status: {resp.status_code}")
+            logger.debug(f"[MPESA] STK response body: {resp.text}")
+            resp.raise_for_status()
+            return resp.json()
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"[MPESA] STK Push HTTP error: {e}")
+            if e.response is not None:
+                logger.error(f"[MPESA] STK error status code: {e.response.status_code}")
+                logger.error(f"[MPESA] STK error response body: {e.response.text}")
+                try:
+                    error_json = e.response.json()
+                    logger.error(f"[MPESA] STK error parsed: {error_json}")
+                except Exception:
+                    pass
+            raise
 
     def query_stk_status(self, checkout_request_id: str):
         token = self.get_access_token()
@@ -313,20 +360,33 @@ class MpesaViewSet(viewsets.GenericViewSet):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        # Normalize phone to 2547XXXXXXXX format
+        phone = str(data['phone_number']).strip()
+        if phone.startswith('+'):
+            phone = phone[1:]
+        elif phone.startswith('0'):
+            phone = '254' + phone[1:]
+        
+        amount = max(1, int(data['amount']))
+        
+        logger.debug(f"[MPESA] STK Push requested — phone: {phone}, amount: {amount}, sale_id: {data['sale_id']}")
+
         try:
             sale = Sale.objects.get(pk=data['sale_id'])
         except Sale.DoesNotExist:
+            logger.error(f"[MPESA] Sale {data['sale_id']} not found")
             return Response({'error': 'Sale not found'}, status=404)
 
         try:
             resp = mpesa_service.stk_push(
-                phone=data['phone_number'],
-                amount=int(data['amount']),
+                phone=phone,
+                amount=amount,
                 account_ref=sale.receipt_number,
                 description=f"Pharmacy payment {sale.receipt_number}"
             )
+            logger.debug(f"[MPESA] STK full response: {resp}")
         except Exception as e:
-            logger.error(f"STK Push error: {e}")
+            logger.error(f"[MPESA] STK Push exception: {e}")
             return Response({'error': str(e)}, status=500)
 
         if resp.get('ResponseCode') == '0':
@@ -334,8 +394,8 @@ class MpesaViewSet(viewsets.GenericViewSet):
                 sale=sale,
                 checkout_request_id=resp['CheckoutRequestID'],
                 merchant_request_id=resp.get('MerchantRequestID', ''),
-                phone_number=data['phone_number'],
-                amount=data['amount'],
+                phone_number=phone,
+                amount=amount,
                 status='pending'
             )
             return Response({
@@ -343,7 +403,9 @@ class MpesaViewSet(viewsets.GenericViewSet):
                 'message': resp.get('CustomerMessage', 'STK push sent'),
                 'status': 'pending'
             })
-        return Response({'error': resp.get('errorMessage', 'STK push failed')}, status=400)
+        
+        logger.error(f"[MPESA] STK Push failed — ResponseCode: {resp.get('ResponseCode')}, error: {resp.get('errorMessage')} full: {resp}")
+        return Response({'error': resp.get('errorMessage', 'STK push failed'), 'raw': resp}, status=400)
 
     @action(detail=False, methods=['get'], url_path='status/(?P<checkout_id>[^/.]+)')
     def check_status(self, request, checkout_id=None):

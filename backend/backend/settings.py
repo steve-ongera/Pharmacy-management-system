@@ -144,9 +144,31 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # ─── M-Pesa Daraja Config ──────────────────────────────────────────────────────
-MPESA_CONSUMER_KEY     = config('MPESA_CONSUMER_KEY', default='')
-MPESA_CONSUMER_SECRET  = config('MPESA_CONSUMER_SECRET', default='')
-MPESA_SHORTCODE        = config('MPESA_SHORTCODE', default='174379')
-MPESA_PASSKEY          = config('MPESA_PASSKEY', default='')
-MPESA_CALLBACK_URL     = config('MPESA_CALLBACK_URL', default='https://yourdomain.com/api/mpesa/callback/')
-MPESA_ENVIRONMENT      = config('MPESA_ENVIRONMENT', default='sandbox')  # or 'production'
+# ─── M-Pesa Daraja Config ─────────────────────────────
+
+MPESA_CONSUMER_KEY = config('MPESA_CONSUMER_KEY', default='')
+MPESA_CONSUMER_SECRET = config('MPESA_CONSUMER_SECRET', default='')
+MPESA_SHORTCODE = config('MPESA_SHORTCODE', default='174379')
+MPESA_PASSKEY = config('MPESA_PASSKEY', default='')
+MPESA_CALLBACK_URL = config(
+    'MPESA_CALLBACK_URL',
+    default='https://0704-2c0f-6300-d09-fd00-5903-b0a3-f440-d4a7.ngrok-free.app/api/mpesa/callback/'
+)
+MPESA_ENVIRONMENT = config('MPESA_ENVIRONMENT', default='sandbox')
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'pharmacy_app': {          # ← change to your actual app name
+            'handlers': ['console'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
